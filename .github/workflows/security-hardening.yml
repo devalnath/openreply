@@ -21,14 +21,13 @@ jobs:
           cache: npm
       - name: Update supported dependency releases
         run: |
-          npm pkg set 'dependencies.nodemailer=^10.3.1' 'overrides.next-auth.nodemailer=^10.3.1' 'overrides.@auth/core.nodemailer=^10.3.1'
+          npm pkg set 'dependencies.nodemailer=^10.3.1' 'overrides.next-auth.nodemailer=^10.3.1' 'overrides.@auth/core.nodemailer=^10.3.1' 'overrides.source-map-js=^1.2.2' 'overrides.baseline-browser-mapping=^2.11.0'
           npm install next@16 react@19 react-dom@19 next-auth@beta @auth/prisma-adapter@latest @prisma/adapter-pg@7 @prisma/client@7 nodemailer@latest zod@4
           npm install --save-dev prisma@7 eslint-config-next@16 @types/nodemailer@latest
-      - name: Apply compatible transitive security fixes
-        continue-on-error: true
-        run: npm audit fix
-      - name: Reject high and critical runtime vulnerabilities
-        run: npm audit --omit=dev --audit-level=high
+      - name: Verify reproducible installation
+        run: npm ci
+      - name: Reject runtime vulnerabilities
+        run: npm audit --omit=dev --audit-level=low
       - name: Generate Prisma client
         run: npm run db:generate
         env:
