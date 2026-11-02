@@ -1,0 +1,57 @@
+name: Harden dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [security-hardening]
+    paths: [.github/workflows/security-hardening.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: security-hardening
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Update supported dependency releases
+        run: |
+          npm install next@16 react@19 react-dom@19 next-auth@beta @auth/prisma-adapter@latest @prisma/adapter-pg@7 @prisma/client@7 nodemailer@latest zod@4
+          npm install --save-dev prisma@7 eslint-config-next@16 @types/nodemailer@latest
+      - name: Apply compatible transitive security fixes
+        continue-on-error: true
+        run: npm audit fix
+      - name: Reject high and critical runtime vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://build:build@127.0.0.1:5432/build
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://build:build@127.0.0.1:5432/build
+          NEXT_TELEMETRY_DISABLED: 1
+      - name: Commit only verified dependency manifests
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'security: update and verify application dependencies'
+          git push origin HEAD:main
